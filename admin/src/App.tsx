@@ -810,7 +810,7 @@ function TokenManager({ authApi }: { authApi: any }) {
 // 公告管理
 // ============================================
 
-function AnnouncementManager({ authApi }: { authApi: any }) {
+function AnnouncementManager({ announcementApi }: { announcementApi: any }) {
   const [announcements, setAnnouncements] = useState<Announcement[]>([])
   const [loading, setLoading] = useState(false)
   const [showForm, setShowForm] = useState(false)
@@ -837,7 +837,7 @@ function AnnouncementManager({ authApi }: { authApi: any }) {
   const loadAnnouncements = async () => {
     setLoading(true)
     try {
-      const { data } = await authApi.get('/announcement/admin/list')
+      const { data } = await announcementApi.get('/admin/list')
       setAnnouncements(data.data)
     } catch (err) {
       console.error('Failed to load announcements:', err)
@@ -905,11 +905,11 @@ function AnnouncementManager({ authApi }: { authApi: any }) {
     try {
       if (editing) {
         // 更新
-        await authApi.put(`/announcement/admin/${editing.id}`, payload)
+        await announcementApi.put(`/admin/${editing.id}`, payload)
         alert('公告更新成功！')
       } else {
         // 创建
-        await authApi.post('/announcement/admin', {
+        await announcementApi.post('/admin', {
           id: formId,
           ...payload
         })
@@ -928,7 +928,7 @@ function AnnouncementManager({ authApi }: { authApi: any }) {
     if (!confirm('确定要删除此公告吗？')) return
 
     try {
-      await authApi.delete(`/announcement/admin/${id}`)
+      await announcementApi.delete(`/admin/${id}`)
       alert('删除成功')
       loadAnnouncements()
     } catch (err: any) {
@@ -938,7 +938,7 @@ function AnnouncementManager({ authApi }: { authApi: any }) {
 
   const handleToggle = async (id: string) => {
     try {
-      await authApi.put(`/announcement/admin/${id}/toggle`)
+      await announcementApi.put(`/admin/${id}/toggle`)
       loadAnnouncements()
     } catch (err: any) {
       alert(err.response?.data?.message || '切换状态失败')
@@ -1234,6 +1234,13 @@ export default function App() {
     })
   }, [token])
 
+  const announcementApi = React.useMemo(() => {
+    return axios.create({
+      baseURL: '/v1/announcement',
+      headers: token ? { Authorization: `Bearer ${token}` } : {}
+    })
+  }, [token])
+
   const handleLogin = (newToken: string) => {
     setToken(newToken)
     localStorage.setItem('admin_token', newToken)
@@ -1296,7 +1303,7 @@ export default function App() {
           {currentTab === 'dashboard' && <Dashboard authApi={authApi} />}
           {currentTab === 'licenses' && <LicenseManager authApi={authApi} />}
           {currentTab === 'tokens' && <TokenManager authApi={authApi} />}
-          {currentTab === 'announcements' && <AnnouncementManager authApi={authApi} />}
+          {currentTab === 'announcements' && <AnnouncementManager announcementApi={announcementApi} />}
         </main>
       </div>
     </div>
