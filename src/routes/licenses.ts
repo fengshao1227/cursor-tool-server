@@ -162,17 +162,17 @@ router.post('/activate', async (req, res) => {
       expiresAt = new Date(license.expires_at!)
     }
 
-    // 5. 获取 Cursor Token
-    let cursorToken = ''
-    if (license.cursor_token_id) {
-      const token = await queryOne<CursorToken>(
-        'SELECT token_encrypted, token_iv FROM cursor_tokens WHERE id = ?',
-        [license.cursor_token_id]
-      )
-      if (token) {
-        cursorToken = decryptToken(token.token_encrypted, token.token_iv)
-      }
-    }
+    // 5. 获取所有关联的 Cursor Token
+    const tokenRecords = await queryAll<any>(
+      `SELECT ct.token_encrypted, ct.token_iv 
+       FROM license_tokens lt
+       JOIN cursor_tokens ct ON lt.cursor_token_id = ct.id
+       WHERE lt.license_id = ? AND ct.status != 'disabled'`,
+      [license.id]
+    )
+    
+    const cursorTokens = tokenRecords.map(t => decryptToken(t.token_encrypted, t.token_iv))
+    const cursorToken = cursorTokens[0] || '' // 保持兼容性，返回第一个Token
 
     // 6. 记录日志
     await logUsage(license.id, 'activate', body.machineId || null, ip, true)
@@ -182,7 +182,8 @@ router.post('/activate', async (req, res) => {
       success: true,
       message: '激活成功',
       data: {
-        cursorToken,
+        cursorToken, // 兼容旧版本
+        cursorTokens, // 新增：所有Token列表
         cursorEmail: license.cursor_email,
         expiresAt: expiresAt.toISOString(),
         remainingDays: getRemainingDays(expiresAt.toISOString())
@@ -269,17 +270,17 @@ router.post('/verify', async (req, res) => {
     // 4. 更新验证时间
     await update('UPDATE licenses SET last_verified_at = NOW() WHERE id = ?', [license.id])
 
-    // 5. 获取 Cursor Token
-    let cursorToken = ''
-    if (license.cursor_token_id) {
-      const token = await queryOne<CursorToken>(
-        'SELECT token_encrypted, token_iv FROM cursor_tokens WHERE id = ?',
-        [license.cursor_token_id]
-      )
-      if (token) {
-        cursorToken = decryptToken(token.token_encrypted, token.token_iv)
-      }
-    }
+    // 5. 获取所有关联的 Cursor Token
+    const tokenRecords = await queryAll<any>(
+      `SELECT ct.token_encrypted, ct.token_iv 
+       FROM license_tokens lt
+       JOIN cursor_tokens ct ON lt.cursor_token_id = ct.id
+       WHERE lt.license_id = ? AND ct.status != 'disabled'`,
+      [license.id]
+    )
+    
+    const cursorTokens = tokenRecords.map(t => decryptToken(t.token_encrypted, t.token_iv))
+    const cursorToken = cursorTokens[0] || '' // 保持兼容性，返回第一个Token
 
     // 6. 记录日志
     await logUsage(license.id, 'verify', machineId, ip, true)
@@ -305,7 +306,8 @@ router.post('/verify', async (req, res) => {
       serverTime: new Date().toISOString(),
       data: {
         status: 'active',
-        cursorToken,
+        cursorToken, // 兼容旧版本
+        cursorTokens, // 新增：所有Token列表
         cursorEmail: license.cursor_email,
         expiresAt: license.expires_at,
         remainingDays: getRemainingDays(license.expires_at!)
@@ -336,9 +338,8 @@ router.post('/inject', async (req, res) => {
     }).parse(req.body)
 
     const license = await queryOne<License>(
-      `SELECT l.*, ct.token_encrypted, ct.token_iv 
+      `SELECT l.* 
        FROM licenses l
-       LEFT JOIN cursor_tokens ct ON l.cursor_token_id = ct.id
        WHERE l.license_key = ? AND l.status = 'active'`,
       [body.licenseKey]
     )
@@ -360,17 +361,24 @@ router.post('/inject', async (req, res) => {
       })
     }
 
-    // 解密 Token
-    let cursorToken = ''
-    if ((license as any).token_encrypted) {
-      cursorToken = decryptToken((license as any).token_encrypted, (license as any).token_iv)
-    }
+    // 获取所有关联的 Cursor Token
+    const tokenRecords = await queryAll<any>(
+      `SELECT ct.token_encrypted, ct.token_iv 
+       FROM license_tokens lt
+       JOIN cursor_tokens ct ON lt.cursor_token_id = ct.id
+       WHERE lt.license_id = ? AND ct.status != 'disabled'`,
+      [license.id]
+    )
+    
+    const cursorTokens = tokenRecords.map(t => decryptToken(t.token_encrypted, t.token_iv))
+    const cursorToken = cursorTokens[0] || '' // 保持兼容性，返回第一个Token
 
     await logUsage(license.id, 'inject', body.machineId || null, ip, true)
 
     res.json({
       success: true,
-      cursorToken,
+      cursorToken, // 兼容旧版本
+      cursorTokens, // 新增：所有Token列表
       cursorEmail: license.cursor_email
     })
 

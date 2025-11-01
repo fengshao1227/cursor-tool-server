@@ -240,10 +240,27 @@ function LicenseManager({ authApi }: { authApi: any }) {
   const [note, setNote] = useState('')
   const [useExclusiveToken, setUseExclusiveToken] = useState(true)
   const [generated, setGenerated] = useState<any[]>([])
+  
+  // 多Token选择
+  const [availableTokens, setAvailableTokens] = useState<Token[]>([])
+  const [selectedTokenIds, setSelectedTokenIds] = useState<number[]>([])
+  const [showTokenSelector, setShowTokenSelector] = useState(false)
 
   useEffect(() => {
     loadLicenses()
+    loadAvailableTokens()
   }, [page, statusFilter])
+  
+  const loadAvailableTokens = async () => {
+    try {
+      const { data } = await authApi.get('/tokens')
+      setAvailableTokens(data.data.filter((t: Token) => 
+        t.status === 'available' && (!t.is_exclusive || !t.is_consumed)
+      ))
+    } catch (err) {
+      console.error('Failed to load tokens:', err)
+    }
+  }
 
   const loadLicenses = async () => {
     setLoading(true)
@@ -272,16 +289,28 @@ function LicenseManager({ authApi }: { authApi: any }) {
         validDays,
         maxDevices,
         note,
-        useExclusiveToken
+        useExclusiveToken,
+        selectedTokenIds: selectedTokenIds.length > 0 ? selectedTokenIds : undefined
       })
       setGenerated(data.data)
       alert(data.message || `成功生成 ${data.data.length} 个卡密！`)
+      setSelectedTokenIds([]) // 清空选择
+      setShowTokenSelector(false)
       loadLicenses()
+      loadAvailableTokens() // 刷新Token列表
     } catch (err: any) {
       alert(err.response?.data?.message || '生成失败')
     } finally {
       setGenerating(false)
     }
+  }
+  
+  const toggleTokenSelection = (tokenId: number) => {
+    setSelectedTokenIds(prev => 
+      prev.includes(tokenId) 
+        ? prev.filter(id => id !== tokenId)
+        : [...prev, tokenId]
+    )
   }
 
   const handleRevoke = async (id: number) => {
@@ -389,6 +418,51 @@ function LicenseManager({ authApi }: { authApi: any }) {
             {useExclusiveToken && stats?.available_exclusive > 0 && (
               <div className="help-text">
                 ℹ️ 当前有 {stats.available_exclusive} 个可用独占Token
+              </div>
+            )}
+          </div>
+
+          <div className="form-group">
+            <label>
+              <button 
+                type="button" 
+                className="btn-secondary"
+                onClick={() => setShowTokenSelector(!showTokenSelector)}
+              >
+                {showTokenSelector ? '🔼 收起' : '🔽 展开'} 手动选择Token（可选多个）
+              </button>
+            </label>
+            
+            {showTokenSelector && (
+              <div className="token-selector">
+                <div className="help-text">
+                  💡 选择多个Token，每个卡密将绑定所有选择的Token。如不选择，则按上面的独占模式自动分配。
+                </div>
+                {selectedTokenIds.length > 0 && (
+                  <div className="selected-count">
+                    已选择 <strong>{selectedTokenIds.length}</strong> 个Token
+                  </div>
+                )}
+                <div className="token-list">
+                  {availableTokens.length === 0 ? (
+                    <div className="text-muted">暂无可用Token</div>
+                  ) : (
+                    availableTokens.map(token => (
+                      <label key={token.id} className="token-item">
+                        <input
+                          type="checkbox"
+                          checked={selectedTokenIds.includes(token.id)}
+                          onChange={() => toggleTokenSelection(token.id)}
+                        />
+                        <span>
+                          ID: {token.id} 
+                          {token.is_exclusive && <span className="badge-exclusive">🔒 独占</span>}
+                          {token.note && <span className="text-muted"> - {token.note}</span>}
+                        </span>
+                      </label>
+                    ))
+                  )}
+                </div>
               </div>
             )}
           </div>
@@ -571,7 +645,8 @@ function TokenManager({ authApi }: { authApi: any }) {
       alert('Token 添加成功！')
       setNewToken('')
       setNote('')
-      setIsExclusive(false)
+      // 保持独占模式勾选状态，方便连续添加
+      // setIsExclusive(false)
       loadTokens()
     } catch (err: any) {
       alert(err.response?.data?.message || '添加失败')

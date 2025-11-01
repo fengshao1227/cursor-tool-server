@@ -230,12 +230,45 @@ router.post('/licenses/generate', requireAuth, async (req, res) => {
       validDays: z.number().int().min(0).max(3650),
       maxDevices: z.number().int().min(1).max(10).default(1),
       note: z.string().max(255).optional(),
-      useExclusiveToken: z.boolean().optional().default(true)
+      useExclusiveToken: z.boolean().optional().default(true),
+      selectedTokenIds: z.array(z.number().int()).optional() // 新增：手动选择的Token ID列表
     }).parse(req.body)
 
     let availableTokens: any[] = []
 
-    if (body.useExclusiveToken) {
+    // 如果手动选择了Token，使用选择的Token
+    if (body.selectedTokenIds && body.selectedTokenIds.length > 0) {
+      // 验证所有选择的Token都可用
+      for (const tokenId of body.selectedTokenIds) {
+        const token = await queryOne<any>(
+          `SELECT id, is_exclusive, is_consumed, status FROM cursor_tokens WHERE id = ?`,
+          [tokenId]
+        )
+        
+        if (!token) {
+          return res.status(400).json({ 
+            error: 'TOKEN_NOT_FOUND', 
+            message: `Token ID ${tokenId} 不存在` 
+          })
+        }
+        
+        if (token.status !== 'available') {
+          return res.status(400).json({ 
+            error: 'TOKEN_NOT_AVAILABLE', 
+            message: `Token ID ${tokenId} 状态不可用` 
+          })
+        }
+        
+        if (token.is_exclusive && token.is_consumed) {
+          return res.status(400).json({ 
+            error: 'TOKEN_CONSUMED', 
+            message: `Token ID ${tokenId} 已被消耗` 
+          })
+        }
+        
+        availableTokens.push(token)
+      }
+    } else if (body.useExclusiveToken) {
       // 独占模式：获取独占且未消耗的 Token
       availableTokens = await queryAll<any>(
         `SELECT id FROM cursor_tokens 
@@ -280,36 +313,51 @@ router.post('/licenses/generate', requireAuth, async (req, res) => {
       for (let i = 0; i < body.count; i++) {
         const licenseKey = generateLicenseKey()
         const cursorEmail = generateRandomEmail()
-        const tokenId = availableTokens[i].id
 
         const [result] = await conn.query<any>(
           `INSERT INTO licenses 
-           (license_key, cursor_token_id, cursor_email, valid_days, max_devices, note, created_by) 
-           VALUES (?, ?, ?, ?, ?, ?, ?)`,
-          [licenseKey, tokenId, cursorEmail, body.validDays, body.maxDevices, body.note || null, req.admin]
+           (license_key, cursor_email, valid_days, max_devices, note, created_by) 
+           VALUES (?, ?, ?, ?, ?, ?)`,
+          [licenseKey, cursorEmail, body.validDays, body.maxDevices, body.note || null, req.admin]
         )
 
-        if (body.useExclusiveToken) {
-          // 独占模式：标记 Token 为已消耗，状态改为 exhausted
+        const licenseId = result.insertId
+
+        // 如果选择了多个Token，为这个卡密关联所有选择的Token
+        const tokensForThisLicense = body.selectedTokenIds && body.selectedTokenIds.length > 0 
+          ? availableTokens 
+          : [availableTokens[i]]
+
+        for (const token of tokensForThisLicense) {
+          // 插入关联关系
           await conn.query(
-            'UPDATE cursor_tokens SET is_consumed = TRUE, status = "exhausted", assigned_count = assigned_count + 1 WHERE id = ?',
-            [tokenId]
+            'INSERT INTO license_tokens (license_id, cursor_token_id) VALUES (?, ?)',
+            [licenseId, token.id]
           )
-        } else {
-          // 普通模式：只增加分配计数
-          await conn.query(
-            'UPDATE cursor_tokens SET assigned_count = assigned_count + 1 WHERE id = ?',
-            [tokenId]
-          )
+
+          if (body.useExclusiveToken || token.is_exclusive) {
+            // 独占模式：标记 Token 为已消耗，状态改为 exhausted
+            await conn.query(
+              'UPDATE cursor_tokens SET is_consumed = TRUE, status = "exhausted", assigned_count = assigned_count + 1 WHERE id = ?',
+              [token.id]
+            )
+          } else {
+            // 普通模式：只增加分配计数
+            await conn.query(
+              'UPDATE cursor_tokens SET assigned_count = assigned_count + 1 WHERE id = ?',
+              [token.id]
+            )
+          }
         }
 
         results.push({
-          id: result.insertId,
+          id: licenseId,
           licenseKey,
           cursorEmail,
           validDays: body.validDays,
           maxDevices: body.maxDevices,
-          exclusive: body.useExclusiveToken
+          exclusive: body.useExclusiveToken,
+          tokenCount: tokensForThisLicense.length
         })
       }
 
@@ -319,7 +367,7 @@ router.post('/licenses/generate', requireAuth, async (req, res) => {
     res.json({ 
       success: true, 
       data: licenses,
-      message: `成功生成 ${licenses.length} 个${body.useExclusiveToken ? '独占' : '普通'}卡密`
+      message: `成功生成 ${licenses.length} 个${body.useExclusiveToken ? '独占' : '普通'}卡密${body.selectedTokenIds && body.selectedTokenIds.length > 0 ? `，每个卡密绑定 ${body.selectedTokenIds.length} 个Token` : ''}`
     })
   } catch (error: any) {
     res.status(400).json({ error: 'BAD_REQUEST', message: error.message })
