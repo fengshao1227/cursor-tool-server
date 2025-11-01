@@ -197,12 +197,12 @@ router.post('/admin', requireAuth, async (req, res) => {
       content: z.string().min(1),
       type: z.enum(['info', 'warning', 'error', 'success']).default('info'),
       priority: z.number().int().min(0).max(100).default(50),
-      platforms: z.array(z.string()).optional(),
-      startTime: z.string().optional(),
-      endTime: z.string().optional(),
+      platforms: z.array(z.string()).optional().nullable(),
+      startTime: z.string().optional().nullable(),
+      endTime: z.string().optional().nullable(),
       dismissible: z.boolean().default(true),
       autoShow: z.boolean().default(true),
-      url: z.string().max(500).optional(),
+      url: z.string().max(500).nullish(),
       enabled: z.boolean().default(true)
     }).parse(req.body)
     
@@ -273,7 +273,7 @@ router.put('/admin/:id', requireAuth, async (req, res) => {
       endTime: z.string().optional().nullable(),
       dismissible: z.boolean(),
       autoShow: z.boolean(),
-      url: z.string().max(500).optional().nullable(),
+      url: z.string().max(500).nullish(),
       enabled: z.boolean()
     }).parse(req.body)
     
