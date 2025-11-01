@@ -1,0 +1,36 @@
+# License Server Systemd Service 配置示例
+# 使用方法:
+# 1. 复制到 /etc/systemd/system/license-server.service
+# 2. 修改 WorkingDirectory 为实际路径
+# 3. 修改 User 为实际用户
+# 4. 启用服务: sudo systemctl enable license-server
+# 5. 启动服务: sudo systemctl start license-server
+
+[Unit]
+Description=License Server
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/home/your-user/license-server
+User=your-user
+Group=your-user
+
+# 启动命令
+ExecStart=/usr/bin/docker-compose up -d
+
+# 停止命令
+ExecStop=/usr/bin/docker-compose down
+
+# 重启命令
+ExecReload=/usr/bin/docker-compose restart
+
+# 重启策略
+Restart=on-failure
+RestartSec=10s
+
+[Install]
+WantedBy=multi-user.target
+

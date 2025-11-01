@@ -1,0 +1,74 @@
+# 生产环境 Docker Compose 配置
+# 使用方法: docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+
+version: '3.8'
+
+services:
+  mysql:
+    # 生产环境配置
+    command: >
+      --default-authentication-plugin=mysql_native_password
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
+      --max_connections=200
+      --innodb_buffer_pool_size=256M
+      --innodb_log_file_size=64M
+      --slow_query_log=1
+      --slow_query_log_file=/var/log/mysql/slow.log
+      --long_query_time=2
+    
+    # 资源限制
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+    
+    # 日志配置
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    
+    # 重启策略
+    restart: unless-stopped
+    
+    # 额外的卷挂载
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./mysql-logs:/var/log/mysql
+
+  license-server:
+    # 资源限制
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+    
+    # 日志配置
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    
+    # 重启策略
+    restart: unless-stopped
+    
+    # 环境变量覆盖
+    environment:
+      NODE_ENV: production
+      # 生产环境额外配置
+      NODE_OPTIONS: "--max-old-space-size=384"
+
+volumes:
+  mysql_data:
+

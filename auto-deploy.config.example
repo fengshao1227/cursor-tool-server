@@ -1,0 +1,37 @@
+# License Server 自动部署配置文件示例
+
+# 可以通过环境变量覆盖默认配置
+# 使用方法: export LOG_DIR="/custom/path" && ./auto-deploy.sh
+
+# 日志目录（默认: ./logs）
+LOG_DIR="${LOG_DIR:-./logs}"
+
+# 备份目录（默认: ./backups）
+BACKUP_DIR="${BACKUP_DIR:-./backups}"
+
+# 日志文件路径（默认: ./logs/auto-deploy.log）
+LOG_FILE="${LOG_FILE:-$LOG_DIR/auto-deploy.log}"
+
+# 健康检查最大重试次数（默认: 30）
+HEALTH_CHECK_MAX_RETRIES="${HEALTH_CHECK_MAX_RETRIES:-30}"
+
+# 健康检查重试间隔（秒，默认: 2）
+HEALTH_CHECK_INTERVAL="${HEALTH_CHECK_INTERVAL:-2}"
+
+# 服务启动等待时间（秒，默认: 5）
+SERVICE_START_WAIT="${SERVICE_START_WAIT:-5}"
+
+# 备份保留天数（默认: 7）
+BACKUP_KEEP_DAYS="${BACKUP_KEEP_DAYS:-7}"
+
+# Git 分支（默认: 当前分支）
+GIT_BRANCH="${GIT_BRANCH:-$(git rev-parse --abbrev-ref HEAD)}"
+
+# 是否在部署失败时自动回滚（默认: true）
+AUTO_ROLLBACK="${AUTO_ROLLBACK:-true}"
+
+# Docker Compose 命令（自动检测，可手动指定）
+# DOCKER_COMPOSE="docker compose"
+# 或
+# DOCKER_COMPOSE="docker-compose"
+
