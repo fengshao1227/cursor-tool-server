@@ -8,6 +8,7 @@ import { config } from './config.js'
 import { initDb, queryOne } from './db.js'
 import licensesRouter from './routes/licenses.js'
 import adminRouter from './routes/admin.js'
+import announcementsRouter from './routes/announcements.js'
 import bcrypt from 'bcryptjs'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -53,6 +54,7 @@ async function bootstrap() {
 
   app.use('/v1/licenses', licensesRouter)
   app.use('/v1/admin', adminRouter)
+  app.use('/v1/announcement', announcementsRouter)
 
   // Serve admin SPA if built
   const adminDist = path.join(__dirname, '../admin/dist')

@@ -40,6 +40,24 @@ interface DashboardData {
   recentActivations: any[]
 }
 
+interface Announcement {
+  id: string
+  title: string
+  content: string
+  type: 'info' | 'warning' | 'error' | 'success'
+  priority: number
+  platforms?: string[] | null
+  start_time?: string | null
+  end_time?: string | null
+  dismissible: boolean
+  auto_show: boolean
+  url?: string | null
+  enabled: boolean
+  created_at: string
+  updated_at: string
+  created_by?: string | null
+}
+
 // ============================================
 // 登录页面
 // ============================================
@@ -789,12 +807,425 @@ function TokenManager({ authApi }: { authApi: any }) {
 }
 
 // ============================================
+// 公告管理
+// ============================================
+
+function AnnouncementManager({ authApi }: { authApi: any }) {
+  const [announcements, setAnnouncements] = useState<Announcement[]>([])
+  const [loading, setLoading] = useState(false)
+  const [showForm, setShowForm] = useState(false)
+  const [editing, setEditing] = useState<Announcement | null>(null)
+  
+  // 表单字段
+  const [formId, setFormId] = useState('')
+  const [formTitle, setFormTitle] = useState('')
+  const [formContent, setFormContent] = useState('')
+  const [formType, setFormType] = useState<'info' | 'warning' | 'error' | 'success'>('info')
+  const [formPriority, setFormPriority] = useState(50)
+  const [formPlatforms, setFormPlatforms] = useState<string[]>([])
+  const [formStartTime, setFormStartTime] = useState('')
+  const [formEndTime, setFormEndTime] = useState('')
+  const [formDismissible, setFormDismissible] = useState(true)
+  const [formAutoShow, setFormAutoShow] = useState(true)
+  const [formUrl, setFormUrl] = useState('')
+  const [formEnabled, setFormEnabled] = useState(true)
+
+  useEffect(() => {
+    loadAnnouncements()
+  }, [])
+
+  const loadAnnouncements = async () => {
+    setLoading(true)
+    try {
+      const { data } = await authApi.get('/announcement/admin/list')
+      setAnnouncements(data.data)
+    } catch (err) {
+      console.error('Failed to load announcements:', err)
+      alert('加载公告失败')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const resetForm = () => {
+    setFormId('')
+    setFormTitle('')
+    setFormContent('')
+    setFormType('info')
+    setFormPriority(50)
+    setFormPlatforms([])
+    setFormStartTime('')
+    setFormEndTime('')
+    setFormDismissible(true)
+    setFormAutoShow(true)
+    setFormUrl('')
+    setFormEnabled(true)
+    setEditing(null)
+  }
+
+  const handleCreate = () => {
+    resetForm()
+    setShowForm(true)
+  }
+
+  const handleEdit = (announcement: Announcement) => {
+    setEditing(announcement)
+    setFormId(announcement.id)
+    setFormTitle(announcement.title)
+    setFormContent(announcement.content)
+    setFormType(announcement.type)
+    setFormPriority(announcement.priority)
+    setFormPlatforms(announcement.platforms || [])
+    setFormStartTime(announcement.start_time ? announcement.start_time.slice(0, 16) : '')
+    setFormEndTime(announcement.end_time ? announcement.end_time.slice(0, 16) : '')
+    setFormDismissible(announcement.dismissible)
+    setFormAutoShow(announcement.auto_show)
+    setFormUrl(announcement.url || '')
+    setFormEnabled(announcement.enabled)
+    setShowForm(true)
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    const payload = {
+      title: formTitle,
+      content: formContent,
+      type: formType,
+      priority: formPriority,
+      platforms: formPlatforms.length > 0 ? formPlatforms : null,
+      startTime: formStartTime || null,
+      endTime: formEndTime || null,
+      dismissible: formDismissible,
+      autoShow: formAutoShow,
+      url: formUrl || null,
+      enabled: formEnabled
+    }
+
+    try {
+      if (editing) {
+        // 更新
+        await authApi.put(`/announcement/admin/${editing.id}`, payload)
+        alert('公告更新成功！')
+      } else {
+        // 创建
+        await authApi.post('/announcement/admin', {
+          id: formId,
+          ...payload
+        })
+        alert('公告创建成功！')
+      }
+      
+      setShowForm(false)
+      resetForm()
+      loadAnnouncements()
+    } catch (err: any) {
+      alert(err.response?.data?.message || '操作失败')
+    }
+  }
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('确定要删除此公告吗？')) return
+
+    try {
+      await authApi.delete(`/announcement/admin/${id}`)
+      alert('删除成功')
+      loadAnnouncements()
+    } catch (err: any) {
+      alert(err.response?.data?.message || '删除失败')
+    }
+  }
+
+  const handleToggle = async (id: string) => {
+    try {
+      await authApi.put(`/announcement/admin/${id}/toggle`)
+      loadAnnouncements()
+    } catch (err: any) {
+      alert(err.response?.data?.message || '切换状态失败')
+    }
+  }
+
+  const togglePlatform = (platform: string) => {
+    setFormPlatforms(prev =>
+      prev.includes(platform)
+        ? prev.filter(p => p !== platform)
+        : [...prev, platform]
+    )
+  }
+
+  return (
+    <div className="announcement-manager">
+      <h2>📢 公告管理</h2>
+
+      <div className="section">
+        <button onClick={handleCreate} className="btn-primary">
+          ➕ 新建公告
+        </button>
+      </div>
+
+      {/* 表单对话框 */}
+      {showForm && (
+        <div className="modal-overlay" onClick={() => setShowForm(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>{editing ? '编辑公告' : '新建公告'}</h3>
+              <button onClick={() => setShowForm(false)} className="btn-close">✕</button>
+            </div>
+            
+            <form onSubmit={handleSubmit} className="announcement-form">
+              <div className="form-group">
+                <label>公告 ID *</label>
+                <input
+                  type="text"
+                  value={formId}
+                  onChange={(e) => setFormId(e.target.value)}
+                  placeholder="例如: permission_reminder_2025"
+                  required
+                  disabled={!!editing}
+                />
+                <div className="help-text">唯一标识，创建后不可修改</div>
+              </div>
+
+              <div className="form-group">
+                <label>标题 *</label>
+                <input
+                  type="text"
+                  value={formTitle}
+                  onChange={(e) => setFormTitle(e.target.value)}
+                  placeholder="例如: ⚠️ 重要提醒：请设置软件权限"
+                  maxLength={200}
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label>内容 *</label>
+                <textarea
+                  value={formContent}
+                  onChange={(e) => setFormContent(e.target.value)}
+                  placeholder="输入公告详细内容，支持多行文本"
+                  rows={8}
+                  required
+                />
+              </div>
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label>类型</label>
+                  <select value={formType} onChange={(e) => setFormType(e.target.value as any)}>
+                    <option value="info">ℹ️ 信息（蓝色）</option>
+                    <option value="warning">⚠️ 警告（橙色）</option>
+                    <option value="error">❌ 错误（红色）</option>
+                    <option value="success">✅ 成功（绿色）</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label>优先级（0-100）</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={formPriority}
+                    onChange={(e) => setFormPriority(Number(e.target.value))}
+                  />
+                  <div className="help-text">数值越大越优先，100为最高</div>
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label>目标平台（不选表示所有平台）</label>
+                <div className="checkbox-group">
+                  {['windows', 'mac', 'linux'].map(platform => (
+                    <label key={platform} className="checkbox-label">
+                      <input
+                        type="checkbox"
+                        checked={formPlatforms.includes(platform)}
+                        onChange={() => togglePlatform(platform)}
+                      />
+                      <span>{platform}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label>开始时间（可选）</label>
+                  <input
+                    type="datetime-local"
+                    value={formStartTime}
+                    onChange={(e) => setFormStartTime(e.target.value)}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>结束时间（可选）</label>
+                  <input
+                    type="datetime-local"
+                    value={formEndTime}
+                    onChange={(e) => setFormEndTime(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label>相关链接（可选）</label>
+                <input
+                  type="url"
+                  value={formUrl}
+                  onChange={(e) => setFormUrl(e.target.value)}
+                  placeholder="https://docs.example.com/help"
+                  maxLength={500}
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={formDismissible}
+                    onChange={(e) => setFormDismissible(e.target.checked)}
+                  />
+                  <span>允许用户关闭</span>
+                </label>
+              </div>
+
+              <div className="form-group">
+                <label className="checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={formAutoShow}
+                    onChange={(e) => setFormAutoShow(e.target.checked)}
+                  />
+                  <span>自动显示（启动时弹出）</span>
+                </label>
+              </div>
+
+              <div className="form-group">
+                <label className="checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={formEnabled}
+                    onChange={(e) => setFormEnabled(e.target.checked)}
+                  />
+                  <span>立即启用</span>
+                </label>
+              </div>
+
+              <div className="form-actions">
+                <button type="button" onClick={() => setShowForm(false)} className="btn-secondary">
+                  取消
+                </button>
+                <button type="submit" className="btn-primary">
+                  {editing ? '保存' : '创建'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 公告列表 */}
+      <div className="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>标题</th>
+              <th>类型</th>
+              <th>优先级</th>
+              <th>平台</th>
+              <th>有效期</th>
+              <th>状态</th>
+              <th>创建时间</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              <tr><td colSpan={9} className="text-center">加载中...</td></tr>
+            ) : announcements.length === 0 ? (
+              <tr><td colSpan={9} className="text-center">暂无公告</td></tr>
+            ) : (
+              announcements.map((announcement) => (
+                <tr key={announcement.id}>
+                  <td><code>{announcement.id}</code></td>
+                  <td className="announcement-title">{announcement.title}</td>
+                  <td>
+                    <span className={`type-badge type-${announcement.type}`}>
+                      {announcement.type === 'info' && 'ℹ️ 信息'}
+                      {announcement.type === 'warning' && '⚠️ 警告'}
+                      {announcement.type === 'error' && '❌ 错误'}
+                      {announcement.type === 'success' && '✅ 成功'}
+                    </span>
+                  </td>
+                  <td>
+                    <span className={`priority-badge priority-${announcement.priority >= 80 ? 'high' : announcement.priority >= 50 ? 'medium' : 'low'}`}>
+                      {announcement.priority}
+                    </span>
+                  </td>
+                  <td>
+                    {announcement.platforms && announcement.platforms.length > 0
+                      ? announcement.platforms.join(', ')
+                      : '全部'}
+                  </td>
+                  <td className="time-range">
+                    <div>
+                      {announcement.start_time 
+                        ? new Date(announcement.start_time).toLocaleDateString()
+                        : '永久'}
+                    </div>
+                    <div className="text-muted">
+                      {announcement.end_time 
+                        ? '至 ' + new Date(announcement.end_time).toLocaleDateString()
+                        : ''}
+                    </div>
+                  </td>
+                  <td>
+                    <label className="toggle-switch">
+                      <input
+                        type="checkbox"
+                        checked={announcement.enabled}
+                        onChange={() => handleToggle(announcement.id)}
+                      />
+                      <span className="toggle-slider"></span>
+                    </label>
+                  </td>
+                  <td>{new Date(announcement.created_at).toLocaleDateString()}</td>
+                  <td>
+                    <div className="action-buttons">
+                      <button
+                        onClick={() => handleEdit(announcement)}
+                        className="btn-small btn-secondary"
+                      >
+                        编辑
+                      </button>
+                      <button
+                        onClick={() => handleDelete(announcement.id)}
+                        className="btn-small btn-danger"
+                      >
+                        删除
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
+// ============================================
 // 主应用
 // ============================================
 
 export default function App() {
   const [token, setToken] = useState<string | null>(localStorage.getItem('admin_token'))
-  const [currentTab, setCurrentTab] = useState<'dashboard' | 'licenses' | 'tokens'>('dashboard')
+  const [currentTab, setCurrentTab] = useState<'dashboard' | 'licenses' | 'tokens' | 'announcements'>('dashboard')
 
   const authApi = React.useMemo(() => {
     return axios.create({
@@ -851,6 +1282,12 @@ export default function App() {
             >
               🔑 Token 管理
             </button>
+            <button
+              className={currentTab === 'announcements' ? 'active' : ''}
+              onClick={() => setCurrentTab('announcements')}
+            >
+              📢 公告管理
+            </button>
           </nav>
         </aside>
 
@@ -859,6 +1296,7 @@ export default function App() {
           {currentTab === 'dashboard' && <Dashboard authApi={authApi} />}
           {currentTab === 'licenses' && <LicenseManager authApi={authApi} />}
           {currentTab === 'tokens' && <TokenManager authApi={authApi} />}
+          {currentTab === 'announcements' && <AnnouncementManager authApi={authApi} />}
         </main>
       </div>
     </div>
