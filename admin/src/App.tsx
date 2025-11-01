@@ -238,7 +238,7 @@ function LicenseManager({ authApi }: { authApi: any }) {
   const [validDays, setValidDays] = useState(7)
   const [maxDevices, setMaxDevices] = useState(1)
   const [note, setNote] = useState('')
-  const [useExclusiveToken, setUseExclusiveToken] = useState(false)
+  const [useExclusiveToken, setUseExclusiveToken] = useState(true)
   const [generated, setGenerated] = useState<any[]>([])
 
   useEffect(() => {
@@ -545,7 +545,7 @@ function TokenManager({ authApi }: { authApi: any }) {
   const [stats, setStats] = useState<any>(null)
   const [newToken, setNewToken] = useState('')
   const [note, setNote] = useState('')
-  const [isExclusive, setIsExclusive] = useState(false)
+  const [isExclusive, setIsExclusive] = useState(true)
   const [adding, setAdding] = useState(false)
 
   useEffect(() => {

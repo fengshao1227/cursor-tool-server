@@ -102,7 +102,7 @@ router.post('/tokens', requireAuth, async (req, res) => {
       token: z.string().min(10),
       note: z.string().max(255).optional(),
       maxAssignments: z.number().int().positive().optional(),
-      isExclusive: z.boolean().optional().default(false)
+      isExclusive: z.boolean().optional().default(true)
     }).parse(req.body)
 
     // 加密 Token
@@ -230,7 +230,7 @@ router.post('/licenses/generate', requireAuth, async (req, res) => {
       validDays: z.number().int().min(0).max(3650),
       maxDevices: z.number().int().min(1).max(10).default(1),
       note: z.string().max(255).optional(),
-      useExclusiveToken: z.boolean().optional().default(false)
+      useExclusiveToken: z.boolean().optional().default(true)
     }).parse(req.body)
 
     let availableTokens: any[] = []
