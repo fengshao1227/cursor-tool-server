@@ -863,8 +863,16 @@ function AnnouncementManager({ announcementApi }: { announcementApi: any }) {
     setEditing(null)
   }
 
+  // 生成唯一的公告ID
+  const generateAnnouncementId = () => {
+    const timestamp = Date.now()
+    const random = Math.random().toString(36).substring(2, 8)
+    return `announcement_${timestamp}_${random}`
+  }
+
   const handleCreate = () => {
     resetForm()
+    setFormId(generateAnnouncementId()) // 自动生成ID
     setShowForm(true)
   }
 
@@ -980,11 +988,13 @@ function AnnouncementManager({ announcementApi }: { announcementApi: any }) {
                   type="text"
                   value={formId}
                   onChange={(e) => setFormId(e.target.value)}
-                  placeholder="例如: permission_reminder_2025"
+                  placeholder="自动生成"
                   required
+                  readOnly
                   disabled={!!editing}
+                  style={{ backgroundColor: '#f5f5f5', cursor: 'not-allowed' }}
                 />
-                <div className="help-text">唯一标识，创建后不可修改</div>
+                <div className="help-text">系统自动生成，创建后不可修改</div>
               </div>
 
               <div className="form-group">
