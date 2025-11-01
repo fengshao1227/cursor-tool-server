@@ -29,6 +29,33 @@ interface Announcement {
 }
 
 // ============================================
+// 辅助函数
+// ============================================
+
+/**
+ * 转换公告数据（MySQL BOOLEAN 返回 0/1，需要转换为 boolean）
+ */
+function transformAnnouncement(announcement: any): any {
+  if (!announcement) return null
+  
+  // 解析 JSON 字段
+  if (announcement.platforms) {
+    try {
+      announcement.platforms = JSON.parse(announcement.platforms)
+    } catch (e) {
+      announcement.platforms = null
+    }
+  }
+  
+  // MySQL BOOLEAN 类型返回 0/1，转换为 boolean
+  announcement.dismissible = Boolean(announcement.dismissible)
+  announcement.auto_show = Boolean(announcement.auto_show)
+  announcement.enabled = Boolean(announcement.enabled)
+  
+  return announcement
+}
+
+// ============================================
 // JWT 认证中间件
 // ============================================
 
@@ -83,18 +110,9 @@ router.get('/current', async (req, res) => {
     
     const announcement = await queryOne<any>(sql, params)
     
-    // 如果有 platforms 字段，解析 JSON
-    if (announcement && announcement.platforms) {
-      try {
-        announcement.platforms = JSON.parse(announcement.platforms)
-      } catch (e) {
-        announcement.platforms = null
-      }
-    }
-    
     res.json({
       success: true,
-      data: announcement
+      data: transformAnnouncement(announcement)
     })
   } catch (error: any) {
     res.status(500).json({ 
@@ -120,20 +138,12 @@ router.get('/admin/list', requireAuth, async (req, res) => {
        ORDER BY priority DESC, created_at DESC`
     )
     
-    // 解析 JSON 字段
-    announcements.forEach(item => {
-      if (item.platforms) {
-        try {
-          item.platforms = JSON.parse(item.platforms)
-        } catch (e) {
-          item.platforms = null
-        }
-      }
-    })
+    // 转换数据
+    const transformedAnnouncements = announcements.map(transformAnnouncement)
     
     res.json({
       success: true,
-      data: announcements
+      data: transformedAnnouncements
     })
   } catch (error: any) {
     res.status(400).json({ 
@@ -163,18 +173,9 @@ router.get('/admin/:id', requireAuth, async (req, res) => {
       })
     }
     
-    // 解析 JSON 字段
-    if (announcement.platforms) {
-      try {
-        announcement.platforms = JSON.parse(announcement.platforms)
-      } catch (e) {
-        announcement.platforms = null
-      }
-    }
-    
     res.json({
       success: true,
-      data: announcement
+      data: transformAnnouncement(announcement)
     })
   } catch (error: any) {
     res.status(400).json({ 

@@ -878,10 +878,11 @@ function AnnouncementManager({ announcementApi }: { announcementApi: any }) {
     setFormPlatforms(announcement.platforms || [])
     setFormStartTime(announcement.start_time ? announcement.start_time.slice(0, 16) : '')
     setFormEndTime(announcement.end_time ? announcement.end_time.slice(0, 16) : '')
-    setFormDismissible(announcement.dismissible)
-    setFormAutoShow(announcement.auto_show)
+    // MySQL BOOLEAN 类型返回的是 0/1，需要转换为 boolean
+    setFormDismissible(Boolean(announcement.dismissible))
+    setFormAutoShow(Boolean(announcement.auto_show))
     setFormUrl(announcement.url || '')
-    setFormEnabled(announcement.enabled)
+    setFormEnabled(Boolean(announcement.enabled))
     setShowForm(true)
   }
 
